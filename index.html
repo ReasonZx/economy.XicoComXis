@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Financial Portfolio - XicoComXis</title>    <!-- Favicons -->
+    <link rel="icon" type="image/x-icon" href="../images/favicon/favicon.ico">
+    <link rel="icon" type="image/png" sizes="16x16" href="../images/favicon/favicon-16x16.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="../images/favicon/favicon-32x32.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="../images/favicon/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="../images/favicon/android-chrome-192x192.png">
+    <link rel="icon" type="image/png" sizes="512x512" href="../images/favicon/android-chrome-512x512.png">
+    
+    <!-- Stylesheets -->
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="portfolio-styles.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    
+    <!-- API Configuration (load before portfolio-script.js) -->
+    <script src="config.js"></script>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="nav-container">            <div class="nav-logo">
+                <a href="../index.html">XicoComXis</a>
+            </div>
+            <ul class="nav-menu">
+                <li class="nav-item">
+                    <a href="#home" class="nav-link">Home</a>
+                </li>
+                <li class="nav-item">
+                    <a href="#overview" class="nav-link">Overview</a>
+                </li>
+                <li class="nav-item">
+                    <a href="#positions" class="nav-link">Positions</a>
+                </li>
+                <li class="nav-item">
+                    <a href="#settings" class="nav-link">Settings</a>
+                </li>
+            </ul>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section id="home" class="hero hero-portfolio">
+        <div class="hero-container">
+            <div class="hero-content">
+                <h1 class="hero-title">Financial Portfolio</h1>
+                <p class="hero-subtitle">Live Portfolio Tracking & Analysis</p>
+                <p class="hero-description">
+                    Real-time portfolio monitoring with live price updates and P&L calculations.
+                    All values have been normalized to a base of 100€ for privacy protection and easier comparison.
+                </p>
+                <div class="last-update">
+                    <i class="fas fa-clock"></i>
+                    <span>Last updated: <span id="lastUpdate">Loading...</span></span>
+                    <span id="dataSource" class="data-source-indicator">
+                        <i class="fas fa-wifi"></i>
+                        <span>Live Data</span>
+                    </span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Overview Section -->
+    <section id="overview" class="overview">
+        <div class="container">
+            <h2 class="section-title">Portfolio Overview</h2>
+            
+            <!-- Portfolio Summary Stats -->
+            <div class="portfolio-summary">
+                <div class="summary-item">
+                    <span class="summary-label">Total Value</span>
+                    <span id="totalValue" class="summary-value">0.00€</span>
+                    <span id="totalChange" class="summary-change">+0.00€ (0.00%)</span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">Best Performer</span>
+                    <span id="bestPerformer" class="summary-value">-</span>
+                    <span id="bestPerformerChange" class="summary-change">-</span>
+                </div>
+            </div>
+
+            <!-- Treemap Container -->
+            <div class="treemap-container">
+                <div class="treemap-header">
+                    <h3 id="treemapTitle">Portfolio Allocation</h3>
+                    <div class="treemap-controls">
+                        <button id="treemapBack" class="treemap-btn" style="display: none;">
+                            <i class="fas fa-arrow-left"></i> Back to Categories
+                        </button>
+                        <button id="treemapReset" class="treemap-btn">
+                            <i class="fas fa-home"></i> Reset View
+                        </button>
+                    </div>
+                </div>
+                <div id="treemap" class="treemap-chart"></div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Positions Section -->
+    <section id="positions" class="positions">
+        <div class="container">
+            <h2 class="section-title">Current Positions</h2>
+            
+            <div class="positions-tabs">
+                <button class="tab-button active" data-tab="all">All Positions</button>
+                <button class="tab-button" data-tab="crypto">Crypto</button>
+                <button class="tab-button" data-tab="stocks">Stocks</button>
+                <button class="tab-button" data-tab="bonds">Bonds</button>
+                <button class="tab-button" data-tab="cash">Cash</button>
+            </div>
+
+            <div id="positionsContainer" class="positions-grid">
+                <!-- Positions will be loaded here -->
+            </div>
+        </div>
+    </section>
+
+    <!-- Settings Section -->
+    <section id="settings" class="settings">
+        <div class="container">
+            <h2 class="section-title">Portfolio Settings</h2>
+            
+            <div class="settings-grid">
+                <div class="settings-card">
+                    <h3>Add New Position</h3>
+                    <form id="addPositionForm" class="position-form">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="assetType">Asset Type</label>
+                                <select id="assetType" required>
+                                    <option value="">Select Type</option>
+                                    <option value="crypto">Cryptocurrency</option>
+                                    <option value="stock">Stock</option>
+                                    <option value="bond">Bond</option>
+                                    <option value="cash">Cash</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="symbol">Symbol/Ticker</label>
+                                <input type="text" id="symbol" placeholder="e.g., BTC, AAPL, EUR" required>
+                            </div>
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="entryPrice">Entry Price</label>
+                                <input type="number" id="entryPrice" step="0.01" placeholder="Entry price" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="multiplier">Multiplier</label>
+                                <input type="number" id="multiplier" step="0.1" placeholder="Amount multiplier" required>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="notes">Notes (Optional)</label>
+                            <input type="text" id="notes" placeholder="Additional notes">
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary">Add Position</button>
+                    </form>
+                </div>
+
+                <div class="settings-card">
+                    <h3>Data Sources</h3>
+                    <div class="data-sources">
+                        <div class="source-item">
+                            <i class="fas fa-globe"></i>
+                            <div>
+                                <strong>Cryptocurrency</strong>
+                                <p>CoinGecko API</p>
+                            </div>
+                            <span class="status-badge active">Active</span>
+                        </div>
+                        <div class="source-item">
+                            <i class="fas fa-chart-line"></i>
+                            <div>
+                                <strong>Stocks</strong>
+                                <p>Alpha Vantage API</p>
+                            </div>
+                            <span class="status-badge active">Active</span>
+                        </div>
+                        <div class="source-item">
+                            <i class="fas fa-university"></i>
+                            <div>
+                                <strong>Bonds</strong>
+                                <p>Manual Entry</p>
+                            </div>
+                            <span class="status-badge manual">Manual</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <p>&copy; 2025 XicoComXis. All rights reserved. | Financial data for educational purposes only.</p>
+        </div>
+    </footer>
+
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="loading-overlay">
+        <div class="loading-spinner">
+            <i class="fas fa-spinner fa-spin"></i>
+            <p>Updating portfolio data...</p>
+        </div>
+    </div>    <script src="script.js"></script>
+    <script src="portfolio-script.js"></script>
+</body>
+</html>
