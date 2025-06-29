@@ -111,9 +111,9 @@
             <div class="positions-tabs">
                 <button class="tab-button active" data-tab="all">All Positions</button>
                 <button class="tab-button" data-tab="crypto">Crypto</button>
-                <button class="tab-button" data-tab="stocks">Stocks</button>
-                <button class="tab-button" data-tab="bonds">Bonds</button>
-                <button class="tab-button" data-tab="cash">Cash</button>
+                <button class="tab-button" data-tab="stocks">Stocks/ETFs</button>
+                <button class="tab-button" data-tab="bonds">Cash Equivalents</button>
+                <button class="tab-button" data-tab="p2p">P2P</button>
             </div>
 
             <div id="positionsContainer" class="positions-grid">
@@ -129,39 +129,51 @@
             
             <div class="settings-grid">
                 <div class="settings-card">
-                    <h3>Add New Position</h3>
+                    <div class="card-header-with-lock">
+                        <h3>Add New Position</h3>
+                        <span id="lockIndicator" class="lock-indicator locked clickable" style="display: none;">
+                            <i class="fas fa-lock"></i>
+                            <span>Locked</span>
+                        </span>
+                    </div>
                     <form id="addPositionForm" class="position-form">
                         <div class="form-row">
                             <div class="form-group">
                                 <label for="assetType">Asset Type</label>
-                                <select id="assetType" required>
+                                <select id="assetType" name="assetType" required>
                                     <option value="">Select Type</option>
                                     <option value="crypto">Cryptocurrency</option>
-                                    <option value="stock">Stock</option>
-                                    <option value="bond">Bond</option>
-                                    <option value="cash">Cash</option>
+                                    <option value="stock">Stocks/ETFs</option>
+                                    <option value="bond">Cash Equivalents</option>
+                                    <option value="p2p">P2P Lending</option>
                                 </select>
                             </div>
                             <div class="form-group">
                                 <label for="symbol">Symbol/Ticker</label>
-                                <input type="text" id="symbol" placeholder="e.g., BTC, AAPL, EUR" required>
+                                <input type="text" id="symbol" name="symbol" placeholder="e.g., BTC, AAPL, EUR" required>
                             </div>
                         </div>
                         
                         <div class="form-row">
                             <div class="form-group">
                                 <label for="entryPrice">Entry Price</label>
-                                <input type="number" id="entryPrice" step="0.01" placeholder="Entry price" required>
+                                <input type="number" id="entryPrice" name="entryPrice" step="0.01" placeholder="Entry price" required>
                             </div>
                             <div class="form-group">
                                 <label for="multiplier">Multiplier</label>
-                                <input type="number" id="multiplier" step="0.1" placeholder="Amount multiplier" required>
+                                <input type="number" id="multiplier" name="multiplier" step="0.1" placeholder="Amount multiplier" required>
                             </div>
                         </div>
                         
                         <div class="form-group">
                             <label for="notes">Notes (Optional)</label>
-                            <input type="text" id="notes" placeholder="Additional notes">
+                            <input type="text" id="notes" name="notes" placeholder="Additional notes">
+                        </div>
+                        
+                        <!-- Error message area -->
+                        <div id="formErrorMessage" class="form-error-message" style="display: none;">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            <span id="formErrorText"></span>
                         </div>
                         
                         <button type="submit" class="btn btn-primary">Add Position</button>
@@ -175,23 +187,31 @@
                             <i class="fas fa-globe"></i>
                             <div>
                                 <strong>Cryptocurrency</strong>
-                                <p>CoinGecko API</p>
+                                <p>CoinGecko API - Real-time crypto prices</p>
                             </div>
                             <span class="status-badge active">Active</span>
                         </div>
                         <div class="source-item">
                             <i class="fas fa-chart-line"></i>
                             <div>
-                                <strong>Stocks</strong>
-                                <p>Alpha Vantage API</p>
+                                <strong>Stocks/ETFs</strong>
+                                <p>Financial Modeling Prep & Yahoo Finance APIs</p>
                             </div>
                             <span class="status-badge active">Active</span>
                         </div>
                         <div class="source-item">
                             <i class="fas fa-university"></i>
                             <div>
-                                <strong>Bonds</strong>
-                                <p>Manual Entry</p>
+                                <strong>Cash Equivalents</strong>
+                                <p>Manual Entry - Stable assets</p>
+                            </div>
+                            <span class="status-badge manual">Manual</span>
+                        </div>
+                        <div class="source-item">
+                            <i class="fas fa-handshake"></i>
+                            <div>
+                                <strong>P2P Lending</strong>
+                                <p>Manual Entry - Estimated returns</p>
                             </div>
                             <span class="status-badge manual">Manual</span>
                         </div>
@@ -214,7 +234,8 @@
             <i class="fas fa-spinner fa-spin"></i>
             <p>Updating portfolio data...</p>
         </div>
-    </div>    <script src="script.js"></script>
+    </div>    
+    <script src="script.js"></script>
     <script src="portfolio-script.js"></script>
 </body>
 </html>
