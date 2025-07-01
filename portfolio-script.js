@@ -6,6 +6,12 @@ const API_CONFIG = {
     RATE_LIMIT_DELAY: 200                             // Milliseconds between API calls (fallback only)
 };
 
+// User Configuration - Loaded from user-config.js
+const USER_CONFIG = {
+    USERNAME: 'demo_user',        // Default - will be overridden by user-config.js
+    DISPLAY_NAME: 'Demo User'     // Default - will be overridden by user-config.js
+};
+
 // European number formatting utility
 function formatNumber(number, decimals = 2) {
     if (typeof number !== 'number' || isNaN(number)) {
@@ -48,33 +54,39 @@ function loadAPIConfig() {
     }
 }
 
-// Portfolio Protection System
+// Load user configuration from external file if available
+function loadUserConfig() {
+    if (typeof window.USER_CONFIG !== 'undefined') {
+        USER_CONFIG.USERNAME = window.USER_CONFIG.USERNAME || USER_CONFIG.USERNAME;
+        USER_CONFIG.DISPLAY_NAME = window.USER_CONFIG.DISPLAY_NAME || USER_CONFIG.DISPLAY_NAME;
+        console.log('User config loaded:', USER_CONFIG.USERNAME);
+    } else {
+        console.log('Using default user config:', USER_CONFIG.USERNAME);
+    }
+}
+
+// Simple Password Protection for Modifications
 class PortfolioAuth {
     constructor() {
+        this.authToken = null;
+        this.tokenExpiry = null;
         this.isUnlocked = false;
-        this.lastActivity = Date.now();
-        this.autoLockMinutes = 30; // Default
-        this.passwordHash = null;
-        
-        this.loadConfig();
-        this.setupAutoLock();
+        this.startUIUpdater();
     }
-    
-    loadConfig() {
-        if (typeof window.PORTFOLIO_CONFIG !== 'undefined') {
-            this.passwordHash = window.PORTFOLIO_CONFIG.PASSWORD_HASH;
-            this.autoLockMinutes = window.PORTFOLIO_CONFIG.AUTO_LOCK_MINUTES || 30;
-            console.log('Portfolio protection enabled');
+
+    isTokenValid() {
+        return this.authToken && this.tokenExpiry && Date.now() < this.tokenExpiry;
+    }
+
+    async checkAccess() {
+        if (this.isTokenValid()) {
+            return true;
         }
-    }
-    
-    isProtectionEnabled() {
-        return this.passwordHash !== null;
-    }
-    
-    async promptForPassword() {
-        if (!this.isProtectionEnabled()) return true;
         
+        return await this.requestPassword();
+    }
+
+    async requestPassword() {
         return new Promise((resolve) => {
             const modal = this.createPasswordModal(resolve);
             document.body.appendChild(modal);
@@ -86,8 +98,8 @@ class PortfolioAuth {
         modal.className = 'password-modal';
         modal.innerHTML = `
             <div class="password-modal-content">
-                <h3><i class="fas fa-lock"></i> Portfolio Access</h3>
-                <p>Enter password to modify portfolio positions:</p>
+                <h3><i class="fas fa-lock"></i> Authentication Required</h3>
+                <p>Enter your password to modify portfolio positions:</p>
                 <div class="password-input-group">
                     <input type="password" id="portfolioPassword" placeholder="Password" autocomplete="off">
                     <button type="button" id="passwordShow" class="password-toggle">
@@ -96,139 +108,131 @@ class PortfolioAuth {
                 </div>
                 <div class="password-modal-actions">
                     <button type="button" id="passwordCancel" class="btn btn-secondary">Cancel</button>
-                    <button type="button" id="passwordSubmit" class="btn btn-primary">Unlock</button>
+                    <button type="button" id="passwordSubmit" class="btn btn-primary">Confirm</button>
                 </div>
                 <div id="passwordError" class="password-error" style="display: none;"></div>
             </div>
         `;
         
-        // Add event listeners
         const passwordInput = modal.querySelector('#portfolioPassword');
         const submitBtn = modal.querySelector('#passwordSubmit');
         const cancelBtn = modal.querySelector('#passwordCancel');
         const showBtn = modal.querySelector('#passwordShow');
         const errorDiv = modal.querySelector('#passwordError');
         
-        const attemptUnlock = () => {
+        const attemptAuth = async () => {
             const password = passwordInput.value;
-            if (this.verifyPassword(password)) {
-                this.unlock();
-                modal.remove();
-                callback(true);
-            } else {
-                errorDiv.textContent = 'Incorrect password';
+            if (!password) {
+                errorDiv.textContent = 'Please enter your password';
                 errorDiv.style.display = 'block';
-                passwordInput.value = '';
-                passwordInput.focus();
+                return;
+            }
+
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Verifying...';
+
+            try {
+                const response = await fetch(`${API_CONFIG.BACKEND_URL}/api/user/${USER_CONFIG.USERNAME}/verify-password`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password })
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    this.authToken = result.token;
+                    this.tokenExpiry = Date.now() + 280000; // 4.5 minutes (token is valid for 5)
+                    this.isUnlocked = true;
+                    modal.remove();
+                    this.updateUIState();
+                    callback(true);
+                } else {
+                    errorDiv.textContent = result.error || 'Invalid password';
+                    errorDiv.style.display = 'block';
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = 'Confirm';
+                }
+            } catch (error) {
+                console.error('Authentication error:', error);
+                errorDiv.textContent = 'Authentication service unavailable';
+                errorDiv.style.display = 'block';
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = 'Confirm';
             }
         };
-        
-        submitBtn.addEventListener('click', attemptUnlock);
-        passwordInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') attemptUnlock();
-        });
-        
+
+        // Event listeners
+        submitBtn.addEventListener('click', attemptAuth);
         cancelBtn.addEventListener('click', () => {
             modal.remove();
             callback(false);
         });
-        
+
         showBtn.addEventListener('click', () => {
             const isPassword = passwordInput.type === 'password';
             passwordInput.type = isPassword ? 'text' : 'password';
             showBtn.innerHTML = isPassword ? '<i class="fas fa-eye-slash"></i>' : '<i class="fas fa-eye"></i>';
         });
-        
-        // Focus password input when modal opens
+
+        passwordInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                attemptAuth();
+            }
+        });
+
+        // Focus password input
         setTimeout(() => passwordInput.focus(), 100);
         
         return modal;
     }
-    
-    verifyPassword(password) {
-        if (!this.passwordHash) return true;
-        const inputHash = btoa(unescape(encodeURIComponent(password)));
-        return inputHash === this.passwordHash;
-    }
-    
-    unlock() {
-        this.isUnlocked = true;
-        this.updateActivity();
-        this.updateUIState();
-        console.log('Portfolio unlocked for editing');
-    }
-    
+
     lock() {
+        this.authToken = null;
+        this.tokenExpiry = null;
         this.isUnlocked = false;
         this.updateUIState();
-        console.log('Portfolio locked');
     }
-    
-    updateActivity() {
-        this.lastActivity = Date.now();
-    }
-    
-    setupAutoLock() {
-        // Check for auto-lock every minute
-        setInterval(() => {
-            if (this.isUnlocked && this.isProtectionEnabled()) {
-                const minutesInactive = (Date.now() - this.lastActivity) / (1000 * 60);
-                if (minutesInactive >= this.autoLockMinutes) {
-                    this.lock();
-                }
-            }
-        }, 60000); // Check every minute
-        
-        // Track user activity
-        ['click', 'keypress', 'mousemove'].forEach(event => {
-            document.addEventListener(event, () => {
-                if (this.isUnlocked) {
-                    this.updateActivity();
-                }
-            });
-        });
-    }
-    
+
     updateUIState() {
-        const editingElements = document.querySelectorAll('.position-actions, #addPositionForm, .edit-btn, .delete-btn');
         const lockIndicator = document.getElementById('lockIndicator');
-        
-        editingElements.forEach(el => {
-            if (this.isProtectionEnabled()) {
-                el.style.display = this.isUnlocked ? 'flex' : 'none';
-            } else {
-                el.style.display = 'flex'; // Always show if no protection
-            }
-        });
-        
-        // Update lock indicator
         if (lockIndicator) {
-            if (this.isProtectionEnabled()) {
-                lockIndicator.style.display = 'flex';
-                lockIndicator.innerHTML = this.isUnlocked 
-                    ? '<i class="fas fa-unlock"></i><span>Unlocked</span>'
-                    : '<i class="fas fa-lock"></i><span>Locked</span>';
-                lockIndicator.className = `lock-indicator clickable ${this.isUnlocked ? 'unlocked' : 'locked'}`;
+            const timeLeft = this.tokenExpiry ? Math.max(0, Math.ceil((this.tokenExpiry - Date.now()) / 1000)) : 0;
+            
+            if (this.isTokenValid()) {
+                lockIndicator.innerHTML = `<i class="fas fa-unlock"></i><span>Unlocked (${Math.ceil(timeLeft / 60)}m)</span>`;
+                lockIndicator.className = 'lock-indicator clickable unlocked';
             } else {
-                lockIndicator.style.display = 'none';
+                lockIndicator.innerHTML = '<i class="fas fa-lock"></i><span>Locked</span>';
+                lockIndicator.className = 'lock-indicator clickable locked';
             }
         }
     }
-    
-    async checkAccess() {
-        if (!this.isProtectionEnabled()) return true;
-        if (this.isUnlocked) return true;
-        
-        return await this.promptForPassword();
+
+    isProtectionEnabled() {
+        return true; // Always enabled for multi-user system
+    }
+
+    // Auto-update UI state every minute
+    startUIUpdater() {
+        setInterval(() => {
+            if (this.isUnlocked) {
+                this.updateUIState();
+                if (!this.isTokenValid()) {
+                    this.isUnlocked = false;
+                }
+            }
+        }, 60000); // Update every minute
     }
 }
 
 class PortfolioManager {
     constructor() {
-        // Load backend configuration
+        // Load configurations
         loadAPIConfig();
+        loadUserConfig();
         
-        this.positions = this.loadPositions();
+        this.portfolios = [];
         this.currentTab = 'all';
         this.isLoading = false;
         
@@ -271,6 +275,82 @@ class PortfolioManager {
             }
         });
 
+        // Auto-calculate shares when entry price or investment amount changes
+        const entryPriceInput = document.getElementById('entryPrice');
+        const investmentAmountInput = document.getElementById('investmentAmount');
+        const calculatedSharesInput = document.getElementById('calculatedShares');
+        const assetTypeInput = document.getElementById('assetType');
+        const symbolInput = document.getElementById('symbol');
+
+        const calculateShares = () => {
+            const entryPrice = parseFloat(entryPriceInput.value);
+            const investmentAmount = parseFloat(investmentAmountInput.value);
+            
+            if (entryPrice > 0 && investmentAmount > 0) {
+                const shares = investmentAmount / entryPrice;
+                calculatedSharesInput.value = shares.toFixed(6);
+            } else {
+                calculatedSharesInput.value = '';
+            }
+        };
+
+        // Handle asset type changes for Cash Equivalents and P2P/Private credit
+        const handleAssetTypeChange = () => {
+            const selectedType = assetTypeInput.value;
+            const symbolHelp = document.getElementById('symbolHelp');
+            const entryPriceHelp = document.getElementById('entryPriceHelp');
+            
+            if (selectedType === 'bond' || selectedType === 'p2p') { // Cash Equivalents or P2P/Private credit
+                // Disable and auto-fill symbol and entry price
+                symbolInput.disabled = true;
+                entryPriceInput.disabled = true;
+                
+                if (selectedType === 'bond') {
+                    symbolInput.value = 'CASH-EQUIV';
+                    entryPriceInput.value = '1.00';
+                } else if (selectedType === 'p2p') {
+                    symbolInput.value = 'P2P-PRIV-CREDIT';
+                    entryPriceInput.value = '1.00';
+                }
+                
+                // Add visual indication that fields are auto-filled
+                symbolInput.style.backgroundColor = '#f5f5f5';
+                entryPriceInput.style.backgroundColor = '#f5f5f5';
+                symbolInput.style.color = '#666';
+                entryPriceInput.style.color = '#666';
+                
+                // Show help text
+                if (symbolHelp) symbolHelp.style.display = 'block';
+                if (entryPriceHelp) entryPriceHelp.style.display = 'block';
+                
+                // Recalculate shares with the fixed entry price
+                calculateShares();
+            } else {
+                // Enable fields for other asset types
+                symbolInput.disabled = false;
+                entryPriceInput.disabled = false;
+                symbolInput.value = '';
+                entryPriceInput.value = '';
+                
+                // Remove visual indication
+                symbolInput.style.backgroundColor = '';
+                entryPriceInput.style.backgroundColor = '';
+                symbolInput.style.color = '';
+                entryPriceInput.style.color = '';
+                
+                // Hide help text
+                if (symbolHelp) symbolHelp.style.display = 'none';
+                if (entryPriceHelp) entryPriceHelp.style.display = 'none';
+                
+                // Clear calculated shares
+                calculatedSharesInput.value = '';
+            }
+        };
+
+        entryPriceInput.addEventListener('input', calculateShares);
+        investmentAmountInput.addEventListener('input', calculateShares);
+        assetTypeInput.addEventListener('change', handleAssetTypeChange);
+
         // Tab buttons
         document.querySelectorAll('.tab-button').forEach(button => {
             button.addEventListener('click', () => {
@@ -290,14 +370,69 @@ class PortfolioManager {
         });
     }
 
-    loadInitialData() {
-        // Load sample data if no positions exist
-        if (this.positions.length === 0) {
-            this.positions = this.getSamplePositions();
-            this.savePositions();
+    async loadInitialData() {
+        try {
+            await this.loadUserPortfolios();
+            this.fetchData();
+        } catch (error) {
+            console.error('Failed to load initial data:', error);
+            // Fallback to empty state
+            this.portfolios = [];
+            this.updateDisplay();
         }
-        
-        this.fetchData();
+    }
+
+    async loadUserPortfolios() {
+        try {
+            console.log(`Loading portfolios for user: ${USER_CONFIG.USERNAME}`);
+            
+            const response = await fetch(`${API_CONFIG.BACKEND_URL}/api/user/${USER_CONFIG.USERNAME}/portfolios`);
+            
+            if (!response.ok) {
+                if (response.status === 404) {
+                    console.warn('User not found - please create user account first');
+                    throw new Error('User not found. Please create your user account first.');
+                }
+                throw new Error(`Failed to load portfolios: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            console.log('📊 Backend response:', data); // Debug log
+            
+            this.portfolios = data.portfolios || [];
+            console.log('📊 Loaded portfolios:', this.portfolios); // Debug log
+            console.log('📊 Total positions across all portfolios:', this.getTotalPositions()); // Debug log
+            
+            // Update user display name if provided
+            if (data.user?.displayName) {
+                document.title = `Financial Portfolio - ${data.user.displayName}`;
+            }
+            
+            console.log(`Loaded ${this.portfolios.length} portfolios with ${this.getTotalPositions()} total positions`);
+            
+            return this.portfolios;
+            
+        } catch (error) {
+            console.error('Error loading user portfolios:', error);
+            throw error;
+        }
+    }
+
+    getTotalPositions() {
+        return this.portfolios.reduce((total, portfolio) => total + (portfolio.positions?.length || 0), 0);
+    }
+
+    // Get all positions from all portfolios for compatibility with existing UI
+    get positions() {
+        const allPositions = this.portfolios.flatMap(portfolio => 
+            (portfolio.positions || []).map(position => ({
+                ...position,
+                portfolioId: portfolio.id,
+                portfolioName: portfolio.name
+            }))
+        );
+        console.log('📊 Flattened positions array:', allPositions); // Debug log
+        return allPositions;
     }
 
     getSamplePositions() {
@@ -350,7 +485,7 @@ class PortfolioManager {
             {
                 id: 'p2p-1',
                 symbol: 'P2P-EUR',
-                name: 'P2P Lending Portfolio',
+                name: 'P2P/Private credit Portfolio',
                 type: 'p2p',
                 entryPrice: 100.00,
                 multiplier: 5.0,
@@ -802,7 +937,7 @@ class PortfolioManager {
     updateP2PPrices() {
         this.positions.forEach(position => {
             if (position.type === 'p2p') {
-                // Mock P2P price movement with small variations
+                // Mock P2P/Private credit price movement with small variations
                 position.currentPrice = position.entryPrice + (Math.random() - 0.5) * 1;
                 position.change24h = (Math.random() - 0.5) * 0.5;
             }
@@ -825,7 +960,7 @@ class PortfolioManager {
             crypto: { name: 'Cryptocurrency', value: 0, count: 0, positions: [], color: '#f59e0b', icon: '₿' },
             stock: { name: 'Stocks/ETFs', value: 0, count: 0, positions: [], color: '#3b82f6', icon: '📈' },
             bond: { name: 'Cash Equivalents', value: 0, count: 0, positions: [], color: '#10b981', icon: '🏛️' },
-            p2p: { name: 'P2P Lending', value: 0, count: 0, positions: [], color: '#8b5cf6', icon: '🤝' },
+            p2p: { name: 'P2P/Private credit', value: 0, count: 0, positions: [], color: '#8b5cf6', icon: '🤝' },
             cash: { name: 'Cash', value: 0, count: 0, positions: [], color: '#6b7280', icon: '💵' }
         };
 
@@ -1116,6 +1251,9 @@ class PortfolioManager {
 
     renderPositions() {
         const container = document.getElementById('positionsContainer');
+        console.log('📊 Rendering positions - total available:', this.positions.length); // Debug log
+        console.log('📊 Current tab filter:', this.currentTab); // Debug log
+        
         const filteredPositions = this.currentTab === 'all' 
             ? this.positions 
             : this.positions.filter(p => {
@@ -1125,6 +1263,8 @@ class PortfolioManager {
                 if (this.currentTab === 'p2p') return p.type === 'p2p';
                 return true;
             });
+
+        console.log('📊 Filtered positions for rendering:', filteredPositions.length); // Debug log
 
         container.innerHTML = filteredPositions.map(position => 
             this.createPositionCard(position)
@@ -1155,7 +1295,7 @@ class PortfolioManager {
             'stock': 'Stocks/ETFs',
             'bond': 'Cash Equivalents',
             'cash': 'Cash',
-            'p2p': 'P2P Lending'
+            'p2p': 'P2P/Private credit'
         };
 
         // Determine price source and status
@@ -1167,7 +1307,7 @@ class PortfolioManager {
             : `$${formatNumber(currentPrice)}`;
 
         return `
-            <div class="position-card" data-id="${position.id}">
+            <div class="position-card" data-id="${position.id}" data-portfolio-id="${position.portfolioId || this.portfolios[0]?.id}">
                 <div class="position-header">
                     <div class="position-info">
                         <div class="symbol-with-indicator">
@@ -1194,7 +1334,7 @@ class PortfolioManager {
                         <div class="value-amount">${priceDisplay}</div>
                     </div>
                     <div class="value-item">
-                        <div class="value-label">Position Value</div>
+                        <div class="value-label">Position Value (Normalized)</div>
                         <div class="value-amount">${formatCurrency(currentValue)}</div>
                     </div>
                     <div class="value-item">
@@ -1202,8 +1342,8 @@ class PortfolioManager {
                         <div class="value-amount">$${formatNumber(position.entryPrice)}</div>
                     </div>
                     <div class="value-item">
-                        <div class="value-label">Multiplier</div>
-                        <div class="value-amount">${position.multiplier}x</div>
+                        <div class="value-label">Portfolio Weight</div>
+                        <div class="value-amount">${position.multiplier.toFixed(3)}x</div>
                     </div>
                 </div>
                 
@@ -1224,8 +1364,13 @@ class PortfolioManager {
                 e.stopPropagation();
                 const hasAccess = await this.auth.checkAccess();
                 if (hasAccess) {
-                    const positionId = btn.closest('.position-card').dataset.id;
-                    this.deletePosition(positionId);
+                    const positionCard = btn.closest('.position-card');
+                    const positionId = positionCard.dataset.id;
+                    const portfolioId = positionCard.dataset.portfolioId;
+                    
+                    if (confirm(`Are you sure you want to delete this position?`)) {
+                        await this.deletePosition(positionId, portfolioId);
+                    }
                 }
             });
         });
@@ -1254,70 +1399,105 @@ class PortfolioManager {
         const symbol = formData.get('symbol');
         const assetType = formData.get('assetType');
         const entryPrice = formData.get('entryPrice');
-        const multiplier = formData.get('multiplier');
+        const investmentAmount = formData.get('investmentAmount');
         const notes = formData.get('notes');
         
-        // Validate required fields
-        if (!symbol || !symbol.trim()) {
-            this.showFormError('Please enter a symbol/ticker.');
-            return;
-        }
+        // For Cash Equivalents and P2P/Private credit, ensure defaults are set if fields are empty
+        const isAutoFillType = (assetType === 'bond' || assetType === 'p2p');
+        const finalSymbol = isAutoFillType ? 
+            (assetType === 'bond' ? 'CASH-EQUIV' : 'P2P-PRIV-CREDIT') : 
+            (symbol || '');
+        const finalEntryPrice = isAutoFillType ? '1.00' : (entryPrice || '');
         
+        console.log('Form data:', { symbol, assetType, entryPrice, investmentAmount, finalSymbol, finalEntryPrice }); // Debug
+        
+        // Validate required fields
         if (!assetType) {
             this.showFormError('Please select an asset type.');
             return;
         }
         
-        if (!entryPrice || isNaN(parseFloat(entryPrice))) {
+        if (!isAutoFillType && (!finalSymbol || !finalSymbol.trim())) {
+            this.showFormError('Please enter a symbol/ticker.');
+            return;
+        }
+        
+        if (!isAutoFillType && (!finalEntryPrice || isNaN(parseFloat(finalEntryPrice)))) {
             this.showFormError('Please enter a valid entry price.');
             return;
         }
         
-        if (!multiplier || isNaN(parseFloat(multiplier))) {
-            this.showFormError('Please enter a valid multiplier.');
+        if (!investmentAmount || isNaN(parseFloat(investmentAmount))) {
+            this.showFormError('Please enter a valid investment amount.');
             return;
         }
-        
-        const position = {
-            id: `${symbol.trim()}-${Date.now()}`,
-            symbol: symbol.trim().toUpperCase(),
-            name: symbol.trim().toUpperCase(), // Could be enhanced with name lookup
-            type: assetType,
-            entryPrice: parseFloat(entryPrice),
-            multiplier: parseFloat(multiplier),
-            notes: notes || ''
-        };
 
-        // Validate the new symbol with the backend before adding to portfolio
-        console.log(`🔍 Validating symbol ${position.symbol}...`);
-        this.showLoading();
+        // For Cash Equivalents and P2P/Private credit, we don't need to validate the symbol
+        const skipSymbolValidation = isAutoFillType;
+
+        // Calculate shares/units from investment amount and entry price
+        const shares = parseFloat(investmentAmount) / parseFloat(finalEntryPrice);
         
-        const validationResult = await this.registerSymbolWithBackend(position.symbol, position.type);
-        
-        this.hideLoading();
-        
-        if (validationResult.success === false) {
-            // Show validation error to user in form with proper HTML handling
-            this.showFormError(
-                validationResult.message || `Symbol ${position.symbol} not found in our data sources.`,
-                validationResult.isHtml || false
-            );
-            return; // Don't add the position if validation failed
+        // Use the first portfolio (or create one if none exists)
+        if (this.portfolios.length === 0) {
+            this.showFormError('No portfolio found. Please create a portfolio first.');
+            return;
         }
 
-        // Only add position if validation succeeded or if there was a network error (offline mode)
-        this.positions.push(position);
-        this.savePositions();
-        
-        this.fetchData();
-        
-        form.reset();
-        this.hideFormError(); // Hide any errors when successfully adding
-        
-        if (validationResult.success) {
-            this.showSuccess(`Position added successfully! Symbol ${position.symbol} validated.`);
-        } else {
-            this.showSuccess('Position added successfully! (Added without validation due to network issues)');
+        const portfolioId = this.portfolios[0].id;
+
+        try {
+            this.showLoading();
+
+            // Validate and register the symbol with the backend (skip for Cash Equivalents)
+            if (!skipSymbolValidation) {
+                const symbolValidation = await this.registerSymbolWithBackend(finalSymbol.trim().toUpperCase(), assetType);
+                
+                if (!symbolValidation.success) {
+                    this.hideLoading();
+                    // Show enhanced error message with HTML support for links
+                    this.showFormError(symbolValidation.message, symbolValidation.isHtml);
+                    return;
+                }
+            }
+
+            // Send the position with real investment amount - backend will handle normalization
+            const response = await fetch(`${API_CONFIG.BACKEND_URL}/api/user/${USER_CONFIG.USERNAME}/portfolios/${portfolioId}/positions`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    symbol: finalSymbol.trim().toUpperCase(),
+                    name: finalSymbol.trim().toUpperCase(),
+                    type: assetType,
+                    entryPrice: parseFloat(finalEntryPrice),
+                    investmentAmount: parseFloat(investmentAmount), // Send real amount
+                    shares: shares, // Calculated shares
+                    notes: notes || '',
+                    token: this.auth.authToken
+                })
+            });
+
+            const result = await response.json();
+            this.hideLoading();
+
+            if (response.ok) {
+                // Reload portfolios to get updated data
+                await this.loadUserPortfolios();
+                this.fetchData();
+                
+                form.reset();
+                this.hideFormError();
+                this.showSuccess(`Position added successfully! ${result.position.symbol} added to portfolio.`);
+            } else {
+                this.showFormError(result.error || 'Failed to add position');
+            }
+
+        } catch (error) {
+            this.hideLoading();
+            console.error('Error adding position:', error);
+            this.showFormError('Failed to add position. Please check your connection and try again.');
         }
     }
 
@@ -1346,16 +1526,16 @@ class PortfolioManager {
                 let enhancedMessage = result.message || `Symbol ${symbol} not found in data sources`;
                 
                 if (result.searchUrl) {
-                    // Convert URL text to clickable links
+                    // Convert URL text to clickable links while preserving the URL text
                     if (type === 'crypto') {
                         enhancedMessage = enhancedMessage.replace(
                             'https://www.coingecko.com/',
-                            '<a href="https://www.coingecko.com/" target="_blank" rel="noopener noreferrer">CoinGecko</a>'
+                            '<a href="https://www.coingecko.com/" target="_blank" rel="noopener noreferrer">https://www.coingecko.com/</a>'
                         );
                     } else {
                         enhancedMessage = enhancedMessage.replace(
                             'https://finance.yahoo.com/lookup/',
-                            '<a href="https://finance.yahoo.com/lookup/" target="_blank" rel="noopener noreferrer">Yahoo Finance Symbol Lookup</a>'
+                            '<a href="https://finance.yahoo.com/lookup/" target="_blank" rel="noopener noreferrer">https://finance.yahoo.com/lookup/</a>'
                         );
                     }
                 }
@@ -1374,8 +1554,8 @@ class PortfolioManager {
             const networkErrorMessage = `Could not connect to validation service. You can still add "${symbol}" to your portfolio, but it won't be validated. ` +
                 `To verify symbols manually, visit: ` +
                 (type === 'crypto' ? 
-                    '<a href="https://www.coingecko.com/" target="_blank" rel="noopener noreferrer">CoinGecko</a>' :
-                    '<a href="https://finance.yahoo.com/lookup/" target="_blank" rel="noopener noreferrer">Yahoo Finance Symbol Lookup</a>'
+                    '<a href="https://www.coingecko.com/" target="_blank" rel="noopener noreferrer">https://www.coingecko.com/</a>' :
+                    '<a href="https://finance.yahoo.com/lookup/" target="_blank" rel="noopener noreferrer">https://finance.yahoo.com/lookup/</a>'
                 );
                 
             return { 
@@ -1498,13 +1678,34 @@ class PortfolioManager {
         }
     }
 
-    loadPositions() {
-        const saved = localStorage.getItem('portfolio-positions');
-        return saved ? JSON.parse(saved) : [];
-    }
+    // Position deletion method
+    async deletePosition(positionId, portfolioId) {
+        try {
+            const response = await fetch(`${API_CONFIG.BACKEND_URL}/api/user/${USER_CONFIG.USERNAME}/portfolios/${portfolioId}/positions/${positionId}/delete`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    token: this.auth.authToken
+                })
+            });
 
-    savePositions() {
-        localStorage.setItem('portfolio-positions', JSON.stringify(this.positions));
+            const result = await response.json();
+
+            if (response.ok) {
+                // Reload portfolios to get updated data
+                await this.loadUserPortfolios();
+                this.fetchData();
+                this.showSuccess('Position deleted successfully!');
+            } else {
+                this.showFormError(result.error || 'Failed to delete position');
+            }
+
+        } catch (error) {
+            console.error('Error deleting position:', error);
+            this.showFormError('Failed to delete position. Please check your connection and try again.');
+        }
     }
 
     getCoinGeckoId(symbol) {

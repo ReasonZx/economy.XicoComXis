@@ -19,7 +19,7 @@
     <script src="https://d3js.org/d3.v7.min.js"></script>
     
     <!-- API Configuration (load before portfolio-script.js) -->
-    <script src="config.js"></script>
+    <script src="user-config.js"></script>
 </head>
 <body>
     <!-- Navigation -->
@@ -85,6 +85,15 @@
                 </div>
             </div>
 
+            <!-- Privacy Notice -->
+            <div class="privacy-notice">
+                <i class="fas fa-shield-alt"></i>
+                <div class="privacy-text">
+                    <strong>Privacy Protection:</strong> All values are normalized to a €100 base for public display. 
+                    Your real investment amounts remain private and are never exposed.
+                </div>
+            </div>
+
             <!-- Treemap Container -->
             <div class="treemap-container">
                 <div class="treemap-header">
@@ -113,7 +122,7 @@
                 <button class="tab-button" data-tab="crypto">Crypto</button>
                 <button class="tab-button" data-tab="stocks">Stocks/ETFs</button>
                 <button class="tab-button" data-tab="bonds">Cash Equivalents</button>
-                <button class="tab-button" data-tab="p2p">P2P</button>
+                <button class="tab-button" data-tab="p2p">P2P/Private credit</button>
             </div>
 
             <div id="positionsContainer" class="positions-grid">
@@ -145,23 +154,33 @@
                                     <option value="crypto">Cryptocurrency</option>
                                     <option value="stock">Stocks/ETFs</option>
                                     <option value="bond">Cash Equivalents</option>
-                                    <option value="p2p">P2P Lending</option>
+                                    <option value="p2p">P2P/Private credit</option>
                                 </select>
                             </div>
                             <div class="form-group">
                                 <label for="symbol">Symbol/Ticker</label>
                                 <input type="text" id="symbol" name="symbol" placeholder="e.g., BTC, AAPL, EUR" required>
+                                <small class="form-help" id="symbolHelp" style="display: none;">Auto-filled for Cash Equivalents and P2P/Private credit</small>
                             </div>
                         </div>
                         
                         <div class="form-row">
                             <div class="form-group">
-                                <label for="entryPrice">Entry Price</label>
-                                <input type="number" id="entryPrice" name="entryPrice" step="0.01" placeholder="Entry price" required>
+                                <label for="entryPrice">Entry Price ($)</label>
+                                <input type="number" id="entryPrice" name="entryPrice" step="0.01" placeholder="Price per unit/share" required>
+                                <small class="form-help" id="entryPriceHelp" style="display: none;">Fixed at $1.00 for Cash Equivalents and P2P/Private credit</small>
                             </div>
                             <div class="form-group">
-                                <label for="multiplier">Multiplier</label>
-                                <input type="number" id="multiplier" name="multiplier" step="0.1" placeholder="Amount multiplier" required>
+                                <label for="investmentAmount">Investment Amount ($)</label>
+                                <input type="number" id="investmentAmount" name="investmentAmount" step="0.01" placeholder="Total amount invested" required>
+                            </div>
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="calculatedShares">Shares/Units</label>
+                                <input type="number" id="calculatedShares" name="calculatedShares" step="0.001" placeholder="Auto-calculated" readonly>
+                                <small class="form-help">Automatically calculated: Investment Amount ÷ Entry Price</small>
                             </div>
                         </div>
                         
@@ -210,7 +229,7 @@
                         <div class="source-item">
                             <i class="fas fa-handshake"></i>
                             <div>
-                                <strong>P2P Lending</strong>
+                                <strong>P2P/Private credit</strong>
                                 <p>Manual Entry - Estimated returns</p>
                             </div>
                             <span class="status-badge manual">Manual</span>

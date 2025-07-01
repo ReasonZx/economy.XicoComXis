@@ -41,6 +41,35 @@
     flex-wrap: wrap;
 }
 
+/* Privacy Notice */
+.privacy-notice {
+    background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+    border: 1px solid #0ea5e9;
+    border-radius: 12px;
+    padding: 1rem 1.5rem;
+    margin: 2rem auto;
+    max-width: 600px;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    font-size: 0.9rem;
+    color: #0c4a6e;
+}
+
+.privacy-notice i {
+    font-size: 1.2rem;
+    color: #0ea5e9;
+    flex-shrink: 0;
+}
+
+.privacy-text {
+    line-height: 1.4;
+}
+
+.privacy-text strong {
+    color: #0c4a6e;
+}
+
 .summary-item {
     text-align: center;
     background: white;
@@ -525,36 +554,47 @@
     box-shadow: 0 0 0 3px rgba(30, 41, 59, 0.1);
 }
 
-/* Form Error Message */
-.form-error-message {
-    background: #fef2f2;
-    border: 1px solid #fecaca;
-    color: #dc2626;
-    padding: 12px 16px;
-    border-radius: 8px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 0.9rem;
-    margin-bottom: 1rem;
-    line-height: 1.4;
+/* Readonly calculated field styling */
+.form-group input[readonly] {
+    background-color: #f8fafc;
+    color: #64748b;
+    cursor: not-allowed;
+    border-color: #e2e8f0;
 }
 
-.form-error-message i {
-    color: #dc2626;
-    flex-shrink: 0;
+.form-group input[readonly]:focus {
+    border-color: #e2e8f0;
+    box-shadow: none;
 }
 
-.form-error-message a {
-    color: #dc2626;
-    text-decoration: underline;
+/* Form help text */
+.form-help {
+    font-size: 0.8rem;
+    color: #64748b;
+    margin-top: 0.25rem;
+    font-style: italic;
+}
+
+/* Enhanced investment amount field */
+.form-group input[name="investmentAmount"] {
+    background: linear-gradient(145deg, #ffffff 0%, #f8fafc 100%);
+    border: 2px solid #e2e8f0;
+    font-weight: 500;
+}
+
+.form-group input[name="investmentAmount"]:focus {
+    border-color: #059669;
+    box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.1);
+    background: white;
+}
+
+/* Calculated shares field highlight */
+.form-group input[name="calculatedShares"] {
+    background: linear-gradient(145deg, #f0fdf4 0%, #f7fee7 100%);
+    border: 1px dashed #16a34a;
+    font-family: 'Monaco', 'Consolas', monospace;
     font-weight: 600;
-    transition: color 0.2s ease;
-}
-
-.form-error-message a:hover {
-    color: #991b1b;
-    text-decoration: none;
+    color: #16a34a;
 }
 
 /* Data Sources */
