@@ -957,11 +957,11 @@ class PortfolioManager {
 
         // Prepare data for treemap
         const categoryData = {
-            crypto: { name: 'Cryptocurrency', value: 0, count: 0, positions: [], color: '#f59e0b', icon: '₿' },
-            stock: { name: 'Stocks/ETFs', value: 0, count: 0, positions: [], color: '#3b82f6', icon: '📈' },
-            bond: { name: 'Cash Equivalents', value: 0, count: 0, positions: [], color: '#10b981', icon: '🏛️' },
-            p2p: { name: 'P2P/Private credit', value: 0, count: 0, positions: [], color: '#8b5cf6', icon: '🤝' },
-            cash: { name: 'Cash', value: 0, count: 0, positions: [], color: '#6b7280', icon: '💵' }
+            crypto: { name: 'Cryptocurrency', value: 0, count: 0, positions: [], color: '#fde68a', icon: '₿' },
+            stock: { name: 'Stocks / ETFs', value: 0, count: 0, positions: [], color: '#bfdbfe', icon: '📈' },
+            bond: { name: 'Cash Equivalents', value: 0, count: 0, positions: [], color: '#bbf7d0', icon: '🏛️' },
+            p2p: { name: 'P2P / Credit', value: 0, count: 0, positions: [], color: '#ddd6fe', icon: '🤝' },
+            cash: { name: 'Cash', value: 0, count: 0, positions: [], color: '#d1d5db', icon: '💵' }
         };
 
         this.positions.forEach(position => {
@@ -1132,6 +1132,7 @@ class PortfolioManager {
             });
 
         // Add text labels
+        const currentView = this.currentView; // Store reference to avoid context issues
         nodes.each(function(d) {
             const node = d3.select(this);
             const width = d.x1 - d.x0;
@@ -1142,29 +1143,31 @@ class PortfolioManager {
                 const textGroup = node.append('g')
                     .attr('class', 'treemap-text-group');
 
-                // Add icon
-                textGroup.append('text')
-                    .attr('class', 'treemap-text')
-                    .attr('x', width / 2)
-                    .attr('y', height / 2 - 10)
-                    .attr('text-anchor', 'middle')
-                    .attr('font-size', '20px')
-                    .text(d.data.icon);
+                // Add icon only for categories view
+                if (currentView === 'categories') {
+                    textGroup.append('text')
+                        .attr('class', 'treemap-text')
+                        .attr('x', width / 2)
+                        .attr('y', height / 2 - 10)
+                        .attr('text-anchor', 'middle')
+                        .attr('font-size', '20px')
+                        .text(d.data.icon);
+                }
 
                 // Add name
                 textGroup.append('text')
                     .attr('class', 'treemap-text')
                     .attr('x', width / 2)
-                    .attr('y', height / 2 + 8)
+                    .attr('y', currentView === 'categories' ? height / 2 + 8 : height / 2 - 2)
                     .attr('text-anchor', 'middle')
                     .attr('font-size', width > 120 ? '14px' : '12px')
                     .text(d.data.name);
 
-                // Add value
+                // Add value - use the percentage that was calculated correctly for each view
                 textGroup.append('text')
                     .attr('class', 'treemap-value')
                     .attr('x', width / 2)
-                    .attr('y', height / 2 + 24)
+                    .attr('y', currentView === 'categories' ? height / 2 + 24 : height / 2 + 16)
                     .attr('text-anchor', 'middle')
                     .text(`${formatCurrency(d.data.value, 0)} (${formatPercentage(d.data.percentage, 1)})`);
             }
@@ -1179,10 +1182,20 @@ class PortfolioManager {
         document.getElementById('treemapTitle').textContent = `${categoryData.name} Holdings`;
         document.getElementById('treemapBack').style.display = 'flex';
 
+        // Calculate total value for this category to get proper percentages
+        const categoryTotal = categoryData.positions.reduce((total, pos) => total + pos.currentValue, 0);
+
+        // Create a color palette for individual positions within a category
+        const positionColors = [
+            '#fecaca', '#fed7aa', '#fde68a', '#d9f99d', '#bbf7d0', 
+            '#a7f3d0', '#bfdbfe', '#c7d2fe', '#ddd6fe', '#f3e8ff',
+            '#fce7f3', '#fed7e2', '#fecdd3', '#e2e8f0', '#f1f5f9'
+        ];
+
         // Prepare positions data for treemap
         const positionsData = {
             name: categoryData.name,
-            children: categoryData.positions.map(position => ({
+            children: categoryData.positions.map((position, index) => ({
                 name: position.symbol,
                 value: position.currentValue,
                 fullName: position.name,
@@ -1191,7 +1204,8 @@ class PortfolioManager {
                 currentPrice: position.currentPrice || position.entryPrice,
                 entryPrice: position.entryPrice,
                 multiplier: position.multiplier,
-                color: this.getPerformanceColor(position.pnlPercent)
+                percentage: categoryTotal > 0 ? (position.currentValue / categoryTotal * 100) : 0,
+                color: positionColors[index % positionColors.length] // Cycle through colors
             }))
         };
 
@@ -1235,6 +1249,7 @@ class PortfolioManager {
                 ${d.data.fullName}<br>
                 Current: $${formatNumber(d.data.currentPrice)}<br>
                 Value: ${formatCurrency(d.data.value)}<br>
+                Category %: ${formatPercentage(d.data.percentage, 1)}<br>
                 P&L: ${sign}${formatCurrency(d.data.pnl)} (${sign}${formatPercentage(d.data.pnlPercent)})
             `;
         }
