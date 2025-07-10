@@ -1356,10 +1356,6 @@ class PortfolioManager {
                         <div class="value-label">Entry Price</div>
                         <div class="value-amount">$${formatNumber(position.entryPrice)}</div>
                     </div>
-                    <div class="value-item">
-                        <div class="value-label">Portfolio Weight</div>
-                        <div class="value-amount">${position.multiplier.toFixed(3)}x</div>
-                    </div>
                 </div>
                 
                 <div class="position-pnl">
