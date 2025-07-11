@@ -299,6 +299,7 @@ class PortfolioManager {
             const selectedType = assetTypeInput.value;
             const symbolHelp = document.getElementById('symbolHelp');
             const entryPriceHelp = document.getElementById('entryPriceHelp');
+            const expectedReturnGroup = document.getElementById('expectedReturnGroup');
             
             if (selectedType === 'bond' || selectedType === 'p2p' || selectedType === 'realestate') { // Cash Equivalents, P2P/Private credit, or Real Estate
                 // Disable and auto-fill symbol and entry price
@@ -326,6 +327,9 @@ class PortfolioManager {
                 if (symbolHelp) symbolHelp.style.display = 'block';
                 if (entryPriceHelp) entryPriceHelp.style.display = 'block';
                 
+                // Show expected return field for these asset types
+                if (expectedReturnGroup) expectedReturnGroup.style.display = 'block';
+                
                 // Recalculate shares with the fixed entry price
                 calculateShares();
             } else {
@@ -344,6 +348,9 @@ class PortfolioManager {
                 // Hide help text
                 if (symbolHelp) symbolHelp.style.display = 'none';
                 if (entryPriceHelp) entryPriceHelp.style.display = 'none';
+                
+                // Hide expected return field for other asset types
+                if (expectedReturnGroup) expectedReturnGroup.style.display = 'none';
                 
                 // Clear calculated shares
                 calculatedSharesInput.value = '';
@@ -1239,6 +1246,31 @@ class PortfolioManager {
             ? '<span class="price-unavailable">N/A</span>' 
             : `$${formatNumber(currentPrice)}`;
 
+        // Check if this position type should show YoY expected return instead of PnL
+        const showExpectedReturn = (position.type === 'bond' || position.type === 'p2p' || position.type === 'realestate');
+        
+        // Generate PnL or Expected Return section
+        let pnlSection;
+        if (showExpectedReturn && position.expectedReturn !== null && position.expectedReturn !== undefined) {
+            // Show YoY Expected Return
+            const expectedReturnClass = position.expectedReturn >= 0 ? 'change-positive' : 'change-negative';
+            const expectedReturnSign = position.expectedReturn >= 0 ? '+' : '';
+            pnlSection = `
+                <div class="position-pnl">
+                    <span class="pnl-label">YoY Expected Return:</span>
+                    <span class="pnl-percentage ${expectedReturnClass}">${expectedReturnSign}${formatPercentage(position.expectedReturn)}</span>
+                </div>
+            `;
+        } else {
+            // Show traditional PnL
+            pnlSection = `
+                <div class="position-pnl">
+                    <span class="pnl-absolute ${pnlClass}">${pnlSign}${formatCurrency(pnl)}</span>
+                    <span class="pnl-percentage ${pnlClass}">${pnlSign}${formatPercentage(pnlPercent)}</span>
+                </div>
+            `;
+        }
+
         return `
             <div class="position-card" data-id="${position.id}" data-portfolio-id="${position.portfolioId || this.portfolios[0]?.id}">
                 <div class="position-header">
@@ -1276,10 +1308,7 @@ class PortfolioManager {
                     </div>
                 </div>
                 
-                <div class="position-pnl">
-                    <span class="pnl-absolute ${pnlClass}">${pnlSign}${formatCurrency(pnl)}</span>
-                    <span class="pnl-percentage ${pnlClass}">${pnlSign}${formatPercentage(pnlPercent)}</span>
-                </div>
+                ${pnlSection}
                 
                 ${position.notes ? `<div class="position-notes">${position.notes}</div>` : ''}
             </div>
@@ -1330,6 +1359,7 @@ class PortfolioManager {
         const entryPrice = formData.get('entryPrice');
         const investmentAmount = formData.get('investmentAmount');
         const notes = formData.get('notes');
+        const expectedReturn = formData.get('expectedReturn');
         
         // For Cash Equivalents, P2P/Private credit, and Real Estate, ensure defaults are set if fields are empty
         const isAutoFillType = (assetType === 'bond' || assetType === 'p2p' || assetType === 'realestate');
@@ -1339,8 +1369,6 @@ class PortfolioManager {
              assetType === 'realestate' ? 'REAL-ESTATE' : '') : 
             (symbol || '');
         const finalEntryPrice = isAutoFillType ? '1.00' : (entryPrice || '');
-        
-        console.log('Form data:', { symbol, assetType, entryPrice, investmentAmount, finalSymbol, finalEntryPrice }); // Debug
         
         // Validate required fields
         if (!assetType) {
@@ -1393,21 +1421,28 @@ class PortfolioManager {
             }
 
             // Send the position with real investment amount - backend will handle normalization
+            const positionData = {
+                symbol: finalSymbol.trim().toUpperCase(),
+                name: finalSymbol.trim().toUpperCase(),
+                type: assetType,
+                entryPrice: parseFloat(finalEntryPrice),
+                investmentAmount: parseFloat(investmentAmount), // Send real amount
+                shares: shares, // Calculated shares
+                notes: notes || '',
+                token: this.auth.authToken
+            };
+            
+            // Add expected return for specific asset types
+            if (isAutoFillType && expectedReturn && !isNaN(parseFloat(expectedReturn))) {
+                positionData.expectedReturn = parseFloat(expectedReturn);
+            }
+            
             const response = await fetch(`${API_CONFIG.BACKEND_URL}/api/user/${USER_CONFIG.USERNAME}/portfolios/${portfolioId}/positions`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({
-                    symbol: finalSymbol.trim().toUpperCase(),
-                    name: finalSymbol.trim().toUpperCase(),
-                    type: assetType,
-                    entryPrice: parseFloat(finalEntryPrice),
-                    investmentAmount: parseFloat(investmentAmount), // Send real amount
-                    shares: shares, // Calculated shares
-                    notes: notes || '',
-                    token: this.auth.authToken
-                })
+                body: JSON.stringify(positionData)
             });
 
             const result = await response.json();
@@ -1877,7 +1912,7 @@ class PortfolioManager {
             };
         }
         
-        if (position.type === 'p2p' || position.type === 'bond') {
+        if (position.type === 'p2p' || position.type === 'bond' || position.type === 'realestate') {
             return {
                 class: 'price-source-estimated',
                 icon: 'fas fa-calculator',

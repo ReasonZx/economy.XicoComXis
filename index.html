@@ -162,7 +162,7 @@
                             <div class="form-group">
                                 <label for="symbol">Symbol/Ticker</label>
                                 <input type="text" id="symbol" name="symbol" placeholder="e.g., BTC, AAPL, EUR" required>
-                                <small class="form-help" id="symbolHelp" style="display: none;">Auto-filled for Cash Equivalents, P2P/Private credit, and Real Estate</small>
+                                <small class="form-help" id="symbolHelp" style="display: none;">Auto-filled for Cash Equivalents and P2P/Private credit</small>
                             </div>
                         </div>
                         
@@ -170,7 +170,7 @@
                             <div class="form-group">
                                 <label for="entryPrice">Entry Price ($)</label>
                                 <input type="number" id="entryPrice" name="entryPrice" step="0.01" placeholder="Price per unit/share" required>
-                                <small class="form-help" id="entryPriceHelp" style="display: none;">Fixed at $1.00 for Cash Equivalents, P2P/Private credit, and Real Estate</small>
+                                <small class="form-help" id="entryPriceHelp" style="display: none;">Fixed at $1.00 for Cash Equivalents and P2P/Private credit</small>
                             </div>
                             <div class="form-group">
                                 <label for="investmentAmount">Investment Amount ($)</label>
@@ -183,6 +183,11 @@
                                 <label for="calculatedShares">Shares/Units</label>
                                 <input type="number" id="calculatedShares" name="calculatedShares" step="0.001" placeholder="Auto-calculated" readonly>
                                 <small class="form-help">Automatically calculated: Investment Amount ÷ Entry Price</small>
+                            </div>
+                            <div class="form-group" id="expectedReturnGroup" style="display: none;">
+                                <label for="expectedReturn">Expected YoY Return (%)</label>
+                                <input type="number" id="expectedReturn" name="expectedReturn" step="0.01" placeholder="e.g., 5.50" min="0" max="100">
+                                <small class="form-help">Expected annual return percentage for this investment</small>
                             </div>
                         </div>
                         

@@ -458,6 +458,13 @@
     margin-top: 1rem;
 }
 
+.pnl-label {
+    font-size: 0.85rem;
+    color: #64748b;
+    font-weight: 500;
+    margin-right: 0.5rem;
+}
+
 .pnl-absolute {
     font-weight: 600;
     font-size: 0.95rem;
