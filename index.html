@@ -123,6 +123,7 @@
                 <button class="tab-button" data-tab="stocks">Stocks/ETFs</button>
                 <button class="tab-button" data-tab="bonds">Cash Equivalents</button>
                 <button class="tab-button" data-tab="p2p">P2P/Private credit</button>
+                <button class="tab-button" data-tab="realestate">Real Estate</button>
             </div>
 
             <div id="positionsContainer" class="positions-grid">
@@ -155,12 +156,13 @@
                                     <option value="stock">Stocks/ETFs</option>
                                     <option value="bond">Cash Equivalents</option>
                                     <option value="p2p">P2P/Private credit</option>
+                                    <option value="realestate">Real Estate</option>
                                 </select>
                             </div>
                             <div class="form-group">
                                 <label for="symbol">Symbol/Ticker</label>
                                 <input type="text" id="symbol" name="symbol" placeholder="e.g., BTC, AAPL, EUR" required>
-                                <small class="form-help" id="symbolHelp" style="display: none;">Auto-filled for Cash Equivalents and P2P/Private credit</small>
+                                <small class="form-help" id="symbolHelp" style="display: none;">Auto-filled for Cash Equivalents, P2P/Private credit, and Real Estate</small>
                             </div>
                         </div>
                         
@@ -168,7 +170,7 @@
                             <div class="form-group">
                                 <label for="entryPrice">Entry Price ($)</label>
                                 <input type="number" id="entryPrice" name="entryPrice" step="0.01" placeholder="Price per unit/share" required>
-                                <small class="form-help" id="entryPriceHelp" style="display: none;">Fixed at $1.00 for Cash Equivalents and P2P/Private credit</small>
+                                <small class="form-help" id="entryPriceHelp" style="display: none;">Fixed at $1.00 for Cash Equivalents, P2P/Private credit, and Real Estate</small>
                             </div>
                             <div class="form-group">
                                 <label for="investmentAmount">Investment Amount ($)</label>
@@ -231,6 +233,14 @@
                             <div>
                                 <strong>P2P / Private credit</strong>
                                 <p>Manual Entry - Estimated returns</p>
+                            </div>
+                            <span class="status-badge manual">Manual</span>
+                        </div>
+                        <div class="source-item">
+                            <i class="fas fa-home"></i>
+                            <div>
+                                <strong>Real Estate</strong>
+                                <p>Manual Entry - Property investments</p>
                             </div>
                             <span class="status-badge manual">Manual</span>
                         </div>

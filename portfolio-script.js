@@ -300,7 +300,7 @@ class PortfolioManager {
             const symbolHelp = document.getElementById('symbolHelp');
             const entryPriceHelp = document.getElementById('entryPriceHelp');
             
-            if (selectedType === 'bond' || selectedType === 'p2p') { // Cash Equivalents or P2P/Private credit
+            if (selectedType === 'bond' || selectedType === 'p2p' || selectedType === 'realestate') { // Cash Equivalents, P2P/Private credit, or Real Estate
                 // Disable and auto-fill symbol and entry price
                 symbolInput.disabled = true;
                 entryPriceInput.disabled = true;
@@ -310,6 +310,9 @@ class PortfolioManager {
                     entryPriceInput.value = '1.00';
                 } else if (selectedType === 'p2p') {
                     symbolInput.value = 'P2P-PRIV-CREDIT';
+                    entryPriceInput.value = '1.00';
+                } else if (selectedType === 'realestate') {
+                    symbolInput.value = 'REAL-ESTATE';
                     entryPriceInput.value = '1.00';
                 }
                 
@@ -637,105 +640,6 @@ class PortfolioManager {
         return data;
     }
 
-    async fetchRealStockPrices(symbols) {
-        // Alpha Vantage API configuration
-        const API_KEY = API_CONFIG.ALPHA_VANTAGE_KEY;
-        const BASE_URL = 'https://www.alphavantage.co/query';
-        
-        console.log('Fetching real stock prices for:', symbols);
-        
-        // If no API key is set, throw error to use fallback
-        if (!API_KEY || API_KEY === 'YOUR_ALPHA_VANTAGE_API_KEY' || API_KEY === '') {
-            console.warn('Alpha Vantage API key not configured. Using fallback data.');
-            throw new Error('Alpha Vantage API key not configured');
-        }
-        
-        // Check if we should skip API calls due to known rate limiting
-        const rateLimit = localStorage.getItem('alphaVantageRateLimit');
-        const inRateLimit = rateLimit && Date.now() - parseInt(rateLimit) < 24 * 60 * 60 * 1000;
-        if (inRateLimit) {
-            console.warn('Alpha Vantage API rate limited (24h cooldown). Using fallback data.');
-            throw new Error('API rate limited - using fallback data');
-        }
-        
-        const results = {};
-        
-        // Fetch prices for each symbol (Alpha Vantage free tier allows 5 calls per minute)
-        for (const symbol of symbols) {
-            try {
-                const response = await fetch(
-                    `${BASE_URL}?function=GLOBAL_QUOTE&symbol=${symbol}&apikey=${API_KEY}`
-                );
-                
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                
-                const data = await response.json();
-                
-                // Debug: Log the actual API response
-                console.log(`Alpha Vantage API response for ${symbol}:`, data);
-                
-                // Check for API limit error or informational messages
-                if (data['Note'] && data['Note'].includes('API call frequency')) {
-                    console.warn('Alpha Vantage API rate limit hit');
-                    throw new Error('API rate limit exceeded');
-                }
-                
-                // Check for informational messages (like rate limit info)
-                if (data['Information']) {
-                    console.warn(`Alpha Vantage API info for ${symbol}:`, data['Information']);
-                    if (data['Information'].includes('API rate limit') || 
-                        data['Information'].includes('25 requests') ||
-                        data['Information'].includes('standard API rate limit')) {
-                        console.warn('Daily API rate limit reached. Storing rate limit timestamp.');
-                        // Store rate limit timestamp to avoid further API calls for 24h
-                        localStorage.setItem('alphaVantageRateLimit', Date.now().toString());
-                        throw new Error('API rate limit reached');
-                    }
-                }
-                
-                // Check for API error messages
-                if (data['Error Message']) {
-                    console.error(`Alpha Vantage API error for ${symbol}:`, data['Error Message']);
-                    throw new Error(`API error: ${data['Error Message']}`);
-                }
-                
-                // Parse Alpha Vantage response
-                const quote = data['Global Quote'];
-                if (quote && quote['05. price']) {
-                    const currentPrice = parseFloat(quote['05. price']);
-                    const previousClose = parseFloat(quote['08. previous close']);
-                    const change = currentPrice - previousClose;
-                    const changePercent = (change / previousClose) * 100;
-                    
-                    results[symbol] = {
-                        price: currentPrice,
-                        change: changePercent,
-                        previousClose: previousClose
-                    };
-                    
-                    console.log(`✓ ${symbol}: $${formatNumber(currentPrice)} (${formatPercentage(changePercent)})`);
-                } else {
-                    console.warn(`No 'Global Quote' data found for ${symbol}. Available keys:`, Object.keys(data));
-                    console.warn(`Response might be rate-limited or invalid. Using fallback data.`);
-                    results[symbol] = this.getFallbackStockPrice(symbol);
-                }
-                
-                // Rate limiting: wait between requests
-                if (symbols.indexOf(symbol) < symbols.length - 1) {
-                    await new Promise(resolve => setTimeout(resolve, API_CONFIG.RATE_LIMIT_DELAY));
-                }
-                
-            } catch (error) {
-                console.error(`Error fetching ${symbol}:`, error.message);
-                results[symbol] = this.getFallbackStockPrice(symbol);
-            }
-        }
-        
-        return results;
-    }
-
     async fetchFMPStockPrices(symbols) {
         const API_KEY = API_CONFIG.FMP_KEY;
         const BASE_URL = 'https://financialmodelingprep.com/api/v3/quote';
@@ -872,6 +776,17 @@ class PortfolioManager {
                     position.change24h = null;
                     position.unavailable = true;
                 }
+            } else if (position.type === 'realestate' && cachedPrices.realestate && cachedPrices.realestate[position.symbol]) {
+                const priceData = cachedPrices.realestate[position.symbol];
+                if (priceData.price !== null && priceData.price !== undefined) {
+                    position.currentPrice = priceData.price;
+                    position.change24h = priceData.change;
+                    position.unavailable = false;
+                } else {
+                    position.currentPrice = null;
+                    position.change24h = null;
+                    position.unavailable = true;
+                }
             }
         });
     }
@@ -961,6 +876,7 @@ class PortfolioManager {
             stock: { name: 'Stocks / ETFs', value: 0, count: 0, positions: [], color: '#bfdbfe', icon: '📈' },
             bond: { name: 'Cash Equivalents', value: 0, count: 0, positions: [], color: '#bbf7d0', icon: '🏛️' },
             p2p: { name: 'P2P / Credit', value: 0, count: 0, positions: [], color: '#ddd6fe', icon: '🤝' },
+            realestate: { name: 'Real Estate', value: 0, count: 0, positions: [], color: '#fed7aa', icon: '🏠' },
             cash: { name: 'Cash', value: 0, count: 0, positions: [], color: '#d1d5db', icon: '💵' }
         };
 
@@ -1276,6 +1192,7 @@ class PortfolioManager {
                 if (this.currentTab === 'crypto') return p.type === 'crypto';
                 if (this.currentTab === 'bonds') return p.type === 'bond' || p.type === 'cash'; // Both bond and cash are Cash Equivalents
                 if (this.currentTab === 'p2p') return p.type === 'p2p';
+                if (this.currentTab === 'realestate') return p.type === 'realestate';
                 return true;
             });
 
@@ -1310,7 +1227,8 @@ class PortfolioManager {
             'stock': 'Stocks/ETFs',
             'bond': 'Cash Equivalents',
             'cash': 'Cash',
-            'p2p': 'P2P/Private credit'
+            'p2p': 'P2P/Private credit',
+            'realestate': 'Real Estate'
         };
 
         // Determine price source and status
@@ -1413,10 +1331,12 @@ class PortfolioManager {
         const investmentAmount = formData.get('investmentAmount');
         const notes = formData.get('notes');
         
-        // For Cash Equivalents and P2P/Private credit, ensure defaults are set if fields are empty
-        const isAutoFillType = (assetType === 'bond' || assetType === 'p2p');
+        // For Cash Equivalents, P2P/Private credit, and Real Estate, ensure defaults are set if fields are empty
+        const isAutoFillType = (assetType === 'bond' || assetType === 'p2p' || assetType === 'realestate');
         const finalSymbol = isAutoFillType ? 
-            (assetType === 'bond' ? 'CASH-EQUIV' : 'P2P-PRIV-CREDIT') : 
+            (assetType === 'bond' ? 'CASH-EQUIV' : 
+             assetType === 'p2p' ? 'P2P-PRIV-CREDIT' : 
+             assetType === 'realestate' ? 'REAL-ESTATE' : '') : 
             (symbol || '');
         const finalEntryPrice = isAutoFillType ? '1.00' : (entryPrice || '');
         
@@ -1886,6 +1806,13 @@ class PortfolioManager {
                 position.priceAge = this.calculatePriceAge(priceData.timestamp);
             } else if (position.type === 'p2p' && backendData.p2p && backendData.p2p[position.symbol]) {
                 const priceData = backendData.p2p[position.symbol];
+                position.currentPrice = priceData.price;
+                position.change24h = priceData.change;
+                position.fallback = false;
+                position.priceSource = 'backend';
+                position.priceAge = this.calculatePriceAge(priceData.timestamp);
+            } else if (position.type === 'realestate' && backendData.realestate && backendData.realestate[position.symbol]) {
+                const priceData = backendData.realestate[position.symbol];
                 position.currentPrice = priceData.price;
                 position.change24h = priceData.change;
                 position.fallback = false;
