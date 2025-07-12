@@ -196,6 +196,13 @@ class PortfolioAuth {
 
     updateUIState() {
         const lockIndicator = document.getElementById('lockIndicator');
+        const privacyToggle = document.getElementById('privacyToggle');
+        
+        // Always show privacy toggle (it's always visible, but requires password to change)
+        if (privacyToggle) {
+            privacyToggle.style.display = 'flex';
+        }
+        
         if (lockIndicator) {
             const timeLeft = this.tokenExpiry ? Math.max(0, Math.ceil((this.tokenExpiry - Date.now()) / 1000)) : 0;
             
@@ -235,6 +242,7 @@ class PortfolioManager {
         this.portfolios = [];
         this.currentTab = 'all';
         this.isLoading = false;
+        this.showRealValues = false; // Privacy toggle state
         
         this.auth = new PortfolioAuth(); // Initialize portfolio protection
         
@@ -249,6 +257,7 @@ class PortfolioManager {
         // Initialize UI state based on auth
         setTimeout(() => {
             this.auth.updateUIState();
+            this.updatePrivacyUI(); // Initialize privacy toggle UI
         }, 100);
     }
 
@@ -273,6 +282,11 @@ class PortfolioManager {
                     this.auth.lock();
                 }
             }
+        });
+
+        // Privacy toggle click
+        document.getElementById('privacyToggle').addEventListener('click', async () => {
+            await this.togglePrivacyMode();
         });
 
         // Auto-calculate shares when entry price or investment amount changes
@@ -396,7 +410,9 @@ class PortfolioManager {
         try {
             console.log(`Loading portfolios for user: ${USER_CONFIG.USERNAME}`);
             
-            const response = await fetch(`${API_CONFIG.BACKEND_URL}/api/user/${USER_CONFIG.USERNAME}/portfolios`);
+            // Add privacy parameter to API call
+            const url = `${API_CONFIG.BACKEND_URL}/api/user/${USER_CONFIG.USERNAME}/portfolios${this.showRealValues ? '?showReal=true' : ''}`;
+            const response = await fetch(url);
             
             if (!response.ok) {
                 if (response.status === 404) {
@@ -1722,6 +1738,52 @@ class PortfolioManager {
                     indicator.innerHTML = '<i class="fas fa-exclamation-triangle"></i><span>Fallback Data</span>';
                 }
                 break;
+        }
+    }
+
+    // Privacy toggle methods
+    async togglePrivacyMode() {
+        // Always require authentication to change privacy state
+        const hasAccess = await this.auth.checkAccess();
+        if (hasAccess) {
+            // Toggle the state
+            this.showRealValues = !this.showRealValues;
+            await this.refreshDataWithPrivacyMode();
+            this.updatePrivacyUI();
+        }
+    }
+
+    async refreshDataWithPrivacyMode() {
+        try {
+            this.showLoading();
+            await this.loadUserPortfolios();
+            this.fetchData();
+        } catch (error) {
+            console.error('Error refreshing data with privacy mode:', error);
+        } finally {
+            this.hideLoading();
+        }
+    }
+
+    updatePrivacyUI() {
+        const privacyToggle = document.getElementById('privacyToggle');
+        const privacyToggleText = document.getElementById('privacyToggleText');
+        const privacyNoticeText = document.getElementById('privacyNoticeText');
+
+        if (this.showRealValues) {
+            // Real values mode
+            privacyToggle.classList.add('real-values');
+            privacyToggle.querySelector('i').className = 'fas fa-eye';
+            privacyToggleText.textContent = 'Real Values';
+            privacyToggle.title = 'Click to switch to privacy mode (requires password)';
+            privacyNoticeText.textContent = 'Displaying real investment amounts and values. Toggle requires password authentication.';
+        } else {
+            // Privacy mode
+            privacyToggle.classList.remove('real-values');
+            privacyToggle.querySelector('i').className = 'fas fa-eye-slash';
+            privacyToggleText.textContent = 'Privacy Mode';
+            privacyToggle.title = 'Click to show real values (requires password)';
+            privacyNoticeText.textContent = 'All values are normalized to a €100 base for public display. Toggle requires password authentication.';
         }
     }
 

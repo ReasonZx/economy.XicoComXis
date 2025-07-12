@@ -86,11 +86,10 @@
             </div>
 
             <!-- Privacy Notice -->
-            <div class="privacy-notice">
+            <div class="privacy-notice" id="privacyNotice">
                 <i class="fas fa-shield-alt"></i>
                 <div class="privacy-text">
-                    <strong>Privacy Protection:</strong> All values are normalized to a €100 base for public display. 
-                    Real investment amounts remain private and are never exposed.
+                    <strong>Privacy Protection:</strong> <span id="privacyNoticeText">All values are normalized to a €100 base for public display. Real investment amounts remain private and are never exposed.</span>
                 </div>
             </div>
 
@@ -141,10 +140,16 @@
                 <div class="settings-card">
                     <div class="card-header-with-lock">
                         <h3>Add New Position</h3>
-                        <span id="lockIndicator" class="lock-indicator locked clickable" style="display: none;">
-                            <i class="fas fa-lock"></i>
-                            <span>Locked</span>
-                        </span>
+                        <div class="header-controls">
+                            <span id="privacyToggle" class="privacy-toggle clickable" title="Toggle between normalized and real values (requires password)">
+                                <i class="fas fa-eye-slash"></i>
+                                <span id="privacyToggleText">Privacy Mode</span>
+                            </span>
+                            <span id="lockIndicator" class="lock-indicator locked clickable" style="display: none;">
+                                <i class="fas fa-lock"></i>
+                                <span>Locked</span>
+                            </span>
+                        </div>
                     </div>
                     <form id="addPositionForm" class="position-form">
                         <div class="form-row">

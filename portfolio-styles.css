@@ -798,6 +798,49 @@
     margin: 0;
 }
 
+.header-controls {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+/* Privacy Toggle */
+.privacy-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    background: #f1f5f9;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: #475569;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.privacy-toggle:hover {
+    background: #e2e8f0;
+    border-color: #94a3b8;
+    color: #334155;
+}
+
+.privacy-toggle.real-values {
+    background: #dcfce7;
+    border-color: #16a34a;
+    color: #166534;
+}
+
+.privacy-toggle.real-values:hover {
+    background: #bbf7d0;
+    border-color: #15803d;
+}
+
+.privacy-toggle i {
+    font-size: 0.85rem;
+}
+
 /* Password Modal */
 .password-modal {
     position: fixed;
